@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>不规则半色调点阵效果</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #fff;
+    }
+    canvas {
+      display: block;
+      background: #fff;
+      width: 100vw;
+      height: 100vh;
+    }
+    .needle-title {
+      position: fixed;
+      top: 64px;
+      right: 180px;
+      z-index: 10;
+      font-family: 'Press Start 2P', 'Microsoft YaHei', Arial, Helvetica, sans-serif;
+      font-weight: bold;
+      font-stretch: expanded;
+      font-size: 6.5rem;
+      color: #111;
+      letter-spacing: 0.04em;
+      user-select: none;
+      pointer-events: auto;
+      display: flex;
+      gap: 0.01em;
+      transform: scaleX(1.25);
+    }
+    .needle-title span {
+      display: inline-block;
+      /* 取消transition让交互更即时 */
+      /* transition: transform 0.18s cubic-bezier(.4,2,.6,1), color 0.18s, text-shadow 0.18s, background 0.18s; */
+      text-shadow: 0 2px 0 #fff, 0 0px 0 #000;
+      position: relative;
+      background: none;
+      -webkit-background-clip: initial;
+      background-clip: initial;
+      color: #111;
+    }
+    .needle-title span.active {
+      transform: translateY(-28px) scale(1.18);
+      color: transparent;
+      /* 更密集的网格状像素风格描边 */
+      background: url('data:image/svg+xml;utf8,<svg width=\"3\" height=\"3\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"0\" y=\"0\" width=\"3\" height=\"3\" fill=\"none\"/><rect x=\"0\" y=\"0\" width=\"1\" height=\"3\" fill=\"%231ecb6b\"/><rect x=\"0\" y=\"0\" width=\"3\" height=\"1\" fill=\"%231ecb6b\"/></svg>');
+      background-size: 6px 6px;
+      -webkit-background-clip: text;
+      background-clip: text;
+      text-shadow: none;
+    }
+    @font-face {
+      font-family: 'Press Start 2P';
+      src: local('Press Start 2P'), url('https://fonts.gstatic.com/s/pressstart2p/v12/e3t4euO8KNyFZ0a5eQG5QJw.woff2') format('woff2');
+      font-display: swap;
+    }
+    .list-block {
+      position: fixed;
+      bottom: 40px;
+      left: 48px;
+      z-index: 10;
+      font-family: 'Microsoft YaHei', Arial, Helvetica, sans-serif;
+      font-weight: 400;
+      font-size: 1.08rem;
+      color: #1ecb6b;
+      letter-spacing: 0.04em;
+      user-select: none;
+      pointer-events: auto;
+      line-height: 1.7;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1em;
+    }
+    .list-block a {
+      text-decoration: none;
+      color: inherit;
+      display: inline-block;
+    }
+    .list-block span {
+      position: relative;
+      padding: 0 0 0.1em 0;
+      cursor: pointer;
+      /* 取消transition让交互更即时 */
+      /* transition: color 0.18s; */
+      z-index: 1;
+      display: inline-block;
+      overflow: hidden;
+    }
+    .list-block span::after {
+      content: '';
+      position: absolute;
+      left: 0; bottom: 0;
+      height: 0.09em;
+      width: 0%;
+      background: #1ecb6b;
+      border-radius: 0.04em;
+      z-index: -1;
+      /* transition: width 0.7s cubic-bezier(.7,0,.3,1); */
+      /* 可选：加一点光晕 */
+      box-shadow: 0 0 8px 2px #1ecb6b88;
+    }
+    .list-block span.hovered {
+      color: #111;
+      font-weight: 500;
+    }
+    .list-block span.hovered::after {
+      width: 100%;
+      /* 立即显示，无动画 */
+    }
+    .subpage {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      font-family: 'Microsoft YaHei', Arial, Helvetica, sans-serif;
+      font-size: 2.2rem;
+      color: #222;
+      animation: fadein 0.3s;
+    }
+    .subpage-content {
+      margin-top: 2em;
+      color: #269658;
+      font-size: 1.5rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .back-btn {
+      margin-top: 2em;
+      padding: 0.5em 1.5em;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 0.3em;
+      background: #1ecb6b;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 12px #1ecb6b22;
+      transition: background 0.18s;
+    }
+    .back-btn:hover {
+      background: #16a85a;
+    }
+    @keyframes fadein {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .album-flex {
+      display: flex;
+      align-items: flex-start;
+      gap: 2.5em;
+      margin-top: 8em;
+      margin-left: -4em;
+      justify-content: flex-start;
+    }
+    .album-flip {
+      width: 420px;
+      height: 420px;
+      perspective: 1200px;
+      cursor: pointer;
+      position: relative;
+    }
+    .album-flip-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transition: transform 0.7s cubic-bezier(.4,1.6,.6,1);
+      transform-style: preserve-3d;
+      transform: rotateY(18deg);
+    }
+    .album-flip.flipped .album-flip-inner {
+      transform: rotateY(198deg);
+    }
+    .album-flip-front, .album-flip-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 0;
+      overflow: hidden;
+      box-shadow: 0 8px 48px 0 #0005, 0 2px 12px #0002;
+    }
+    .album-flip-front img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .album-flip-back {
+      background: #fffbe9;
+      color: #222;
+      transform: rotateY(180deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .album-desc {
+      text-align: center;
+      font-size: 1.18rem;
+      line-height: 1.7;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      padding: 0 1.5em;
+    }
+    .album-desc h3 {
+      margin-top: 0;
+      color: #e67c00;
+      font-size: 1.4em;
+      letter-spacing: 0.04em;
+    }
+    .music-visual {
+      margin-top: 2em;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    /* 极简音频控件：白色播放条底部，黑色三角播放键，其余控件隐藏 */
+    .footer-audio {
+      position: fixed;
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%);
+      z-index: 999;
+      width: 100%;
+      max-width: 320px;
+      background: transparent;
+      color: #fff;
+      border-radius: 0.7em;
+      box-shadow: none;
+      padding-bottom: 0;
+      padding-top: 0;
+      display: none;
+    }
+    #page1 .footer-audio {
+      display: block;
+    }
+    .footer-audio::-webkit-media-controls-panel {
+      background: transparent;
+      color: #111;
+      border-radius: 0.7em;
+      box-shadow: none;
+      padding: 0;
+    }
+    .footer-audio::-webkit-media-controls-play-button {
+      background: none !important;
+      border-radius: 0;
+      border: none !important;
+      box-shadow: none;
+      filter: none !important;
+      width: 18px !important;
+      height: 18px !important;
+      min-width: 18px !important;
+      min-height: 18px !important;
+      max-width: 18px !important;
+      max-height: 18px !important;
+      margin: 0 2px 0 0 !important;
+      padding: 0 !important;
+    }
+    .footer-audio::-webkit-media-controls-play-button svg {
+      fill: #111 !important;
+      width: 14px !important;
+      height: 14px !important;
+    }
+    .footer-audio::-webkit-media-controls-mute-button,
+    .footer-audio::-webkit-media-controls-volume-slider,
+    .footer-audio::-webkit-media-controls-volume-slider-container,
+    .footer-audio::-webkit-media-controls-timeline-container,
+    .footer-audio::-webkit-media-controls-seek-back-button,
+    .footer-audio::-webkit-media-controls-seek-forward-button,
+    .footer-audio::-webkit-media-controls-playback-rate-button {
+      display: none !important;
+      width: 0 !important;
+      min-width: 0 !important;
+      max-width: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    .footer-audio::-webkit-media-controls-timeline,
+    .footer-audio::-webkit-media-controls-progress-bar,
+    .footer-audio::-webkit-media-controls-filled-progress-bar {
+      background: #fff;
+      border-radius: 2px;
+      height: 2px;
+      margin-bottom: 0;
+    }
+    .footer-audio::-webkit-media-controls-current-time-display,
+    .footer-audio::-webkit-media-controls-time-remaining-display {
+      display: none !important;
+    }
+    /* 只在Chasing Wind子页面下让专辑封面更靠下 */
+    #page1 .album-flex {
+      margin-top:8em;
+      margin-left:-4em;
+    }
+    .custom-audio {
+      width: 320px;
+      margin: 96px auto 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: none;
+      justify-content: flex-start;
+      position: relative;
+      z-index: 10;
+    }
+    .play-btn {
+      width: 28px; height: 28px;
+      background: none;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .play-btn::before {
+      content: '';
+      display: block;
+      width: 0; height: 0;
+      border-left: 18px solid #111;
+      border-top: 11px solid transparent;
+      border-bottom: 11px solid transparent;
+      margin-left: 2px;
+      transition: border-left-color 0.2s;
+    }
+    .play-btn.paused::before {
+      border-left: 0;
+      border-top: 0;
+      border-bottom: 0;
+      width: 16px;
+      height: 18px;
+      box-sizing: border-box;
+      background: none;
+      border-right: 7px solid #111;
+      border-left: 7px solid #111;
+      margin-left: 0;
+      content: '';
+      display: inline-block;
+    }
+    #progress {
+      flex: 1;
+      height: 2px;
+      background: #fff;
+      border-radius: 2px;
+      outline: none;
+      margin: 0 0 0 0;
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      z-index: 2;
+    }
+    #progress::-webkit-slider-runnable-track {
+      height: 2px;
+      background: #fff;
+      border-radius: 2px;
+    }
+    #progress::-webkit-slider-thumb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #111;
+      border: none;
+      margin-top: -4px;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      box-shadow: 0 0 0 1px #1112;
+    }
+    #progress::-moz-range-thumb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #111;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 0 1px #1112;
+    }
+    #progress::-ms-thumb {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #111;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 0 1px #1112;
+    }
+    #progress::-ms-fill-lower {
+      background: #fff;
+      border-radius: 2px;
+    }
+    #progress::-ms-fill-upper {
+      background: #fff;
+      border-radius: 2px;
+    }
+    #progress:focus {
+      outline: none;
+    }
+    #progress::-webkit-slider-thumb:active {
+      background: #ff9800;
+    }
+    #progress::-webkit-slider-thumb:hover {
+      background: #ff9800;
+    }
+    #progress::-moz-range-thumb:active {
+      background: #ff9800;
+    }
+    #progress::-moz-range-thumb:hover {
+      background: #ff9800;
+    }
+    #progress::-ms-thumb:active {
+      background: #ff9800;
+    }
+    #progress::-ms-thumb:hover {
+      background: #ff9800;
+    }
+    .lyric-block {
+      min-width: 260px;
+      max-width: 340px;
+      height: 420px;
+      overflow-y: scroll;
+      scrollbar-width: none; /* Firefox 隐藏滚动条 */
+    }
+    .lyric-block::-webkit-scrollbar {
+      display: none; /* Chrome/Safari 隐藏滚动条 */
+    }
+    .lyric-content {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.18em;
+      align-items: flex-end;
+      text-align: right;
+      justify-content: flex-start;
+    }
+    .lyric-content span {
+      display: block;
+      word-break: break-word;
+      white-space: normal;
+      color: #ff9800;
+      font-size: 1.13rem;
+      padding: 0 0 0.1em 0;
+    }
+    .lyric-content span.active {
+      color: #d35400;
+      font-weight: bold;
+      font-size: 1.04em;
+      position: relative;
+      transition: font-size 0.5s cubic-bezier(.7,0,.3,1), color 0.5s cubic-bezier(.7,0,.3,1);
+      background: none;
+      -webkit-background-clip: initial;
+      background-clip: initial;
+      text-shadow: 0 2px 16px #ff980055;
+    }
+    .lyric-content span.active::after {
+      content: '';
+      position: absolute;
+      left: 0; bottom: 0.08em;
+      height: 2px;
+      width: 100%;
+      background: linear-gradient(90deg, #d35400 60%, #ffb74d 100%);
+      border-radius: 1px;
+      z-index: 2;
+      box-shadow: 0 0 8px 2px #ff980044;
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: lyric-underline-grow 0.7s cubic-bezier(.7,0,.3,1) forwards;
+      animation-delay: 0s;
+    }
+    .lyric-content span.active.no-underline::after {
+      display: none;
+    }
+    @keyframes lyric-underline-grow {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    @keyframes lyric-bounce {
+      0% { transform: scale(1) translateY(0); }
+      30% { transform: scale(1.15, 0.92) translateY(-8px); }
+      50% { transform: scale(0.98, 1.08) translateY(2px); }
+      70% { transform: scale(1.05, 0.97) translateY(-2px); }
+      100% { transform: scale(1) translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <!-- SVG网格pattern定义 -->
+  <svg width="0" height="0" style="position:absolute;">
+    <defs>
+      <pattern id="pixelGrid" width="6" height="6" patternUnits="userSpaceOnUse">
+        <rect x="0" y="0" width="6" height="6" fill="none"/>
+        <rect x="0" y="0" width="1" height="6" fill="#1ecb6b"/>
+        <rect x="0" y="0" width="6" height="1" fill="#1ecb6b"/>
+      </pattern>
+    </defs>
+  </svg>
+  <div class="needle-title" id="needleTitle">
+    <span>N</span><span>e</span><span>e</span><span>d</span><span>l</span><span>e</span>
+    <span style="width:0.5em;display:inline-block;"></span>
+    <span>P</span><span>i</span><span>x</span><span>e</span><span>l</span>
+  </div>
+  <div id="grass-svg-container" style="position: fixed; right: 0; bottom: 0; z-index: 5; pointer-events: none;">
+    <svg width="900" height="600">
+      <g>
+        <!-- 以半圆分布的200根草线条 -->
+        <!-- 你可以调整N来控制密度和半径 -->
+        <script type="application/javascript">
+          const N = 200;
+          const cx = 700, cy = 600; // 半圆圆心（靠右下）
+          const R = 500; // 半径
+          for(let i=0; i<N; i++) {
+            // 角度从-π到0，分布在半圆上
+            const theta = Math.PI - (i / (N-1)) * Math.PI;
+            // 终点
+            const x1 = cx + R * Math.cos(theta);
+            const y1 = cy + R * Math.sin(theta);
+            // 起点在右下角附近
+            const x0 = 880 + Math.random()*20;
+            const y0 = 590 + Math.random()*10;
+            // 控制点略带随机
+            const cpx = (x0 + x1)/2 + (Math.random()-0.5)*80;
+            const cpy = (y0 + y1)/2 - Math.random()*100;
+            const sw = 0.5 + Math.random()*0.7;
+            const op = 0.6 + Math.random()*0.4;
+            document.write(`<path d="M${x0},${y0} Q${cpx},${cpy} ${x1},${y1}" stroke="#1ecb6b" stroke-width="${sw}" fill="none" opacity="${op}"/>`);
+          }
+        </script>
+      </g>
+    </svg>
+  </div>
+  <div class="list-block" id="listBlock">
+    <a data-page="page1"><span>Chasing Wind ——Tim lyre 2023-11-17</span></a>
+    <a data-page="page2"><span>Doing Time——Bazzi 2003-09-13</span></a>
+    <a data-page="page3"><span>The Boy and The Swan——Jean Dawson 2024-10-18</span></a>
+    <a data-page="page4"><span>Ghostbuster——Elijah Blake 2024-03-15</span></a>
+    <a data-page="page5"><span>DESPERATION——Cero Ismael 2022-03-25</span></a>
+    <a data-page="page6"><span>first order of business——Baby Keem 2021-09-10</span></a>
+    <a data-page="page7"><span>Fall In Line——K Camp 2020-04-24</span></a>
+    <a data-page="page8"><span>HOP OUT CHO FEELINS——Kal Banx / Smino/ Buddy</span></a>
+    <a data-page="page9"><span>WAY TOO FAST——Cero Iamael 2025-03-27</span></a>
+    <a data-page="page10"><span>Rearrange My World——Daneil Caesar/Rex Orange County 2025-02-14</span></a>
+    <a data-page="page11"><span>There's a Field (That's Only Yours)——Daneil Caesar/Rex Orange County 2025-02-14</span></a>
+  </div>
+  <!-- 子页面内容 -->
+  <div id="subpages">
+    <div class="subpage" id="page1">
+      <canvas id="bg-flow" style="position:absolute;inset:0;z-index:0;width:100vw;height:100vh;pointer-events:none;display:none;"></canvas>
+      <button class="back-btn">返回主页</button>
+      <div class="subpage-content">
+        <div class="album-flex">
+          <div class="album-flip">
+            <div class="album-flip-inner">
+              <div class="album-flip-front">
+                <img class="album-cover" src="album-cover.jpg" alt="Chasing Wind 封面">
+              </div>
+              <div class="album-flip-back">
+                <div class="album-desc">
+                  <h3>专辑介绍</h3>
+                  <p>《Chasing Wind》是Tim lyre于2023年11月17日发行的专辑，融合电子与灵魂乐，旋律轻盈，节奏感强，适合夜晚聆听。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="lyric-block">
+            <div class="lyric-content" id="lyricContent">
+              <span data-time="0" class="no-underline">作曲: Cj obassey / Tay Iwar / Timothy Oyesanya</span>
+              <span data-time="43">And after all you did</span>
+              <span data-time="46">It feels like chasing wind</span>
+              <span data-time="48">You still don't have the bills</span>
+              <span data-time="51">To pay for your sins</span>
+              <span data-time="54">And back when it started</span>
+              <span data-time="56">You thought that it would be</span>
+              <span data-time="59">A dream reality</span>
+              <span data-time="62">But nothing's ever what it seems</span>
+              <span data-time="63">Sometimes life come around</span>
+              <span data-time="66">And it hit you from both sides</span>
+              <span data-time="67">One minute you're up</span>
+              <span data-time="68">Then you're down in no time</span>
+              <span data-time="69">Takes a lot for me to get back to my right mind</span>
+              <span data-time="72">Someone tell the devil he can never control mine</span>
+              <span data-time="75">Melodies a come from Jah</span>
+              <span data-time="77">And I stay connected no matter how far</span>
+              <span data-time="79">No man fi ever interrupt the divine</span>
+              <span data-time="82">Pour the oil upon me and make me forehead shine like Woah</span>
+              <span data-time="85">I hope my mama knows that I'll be alright</span>
+              <span data-time="88">Cause every day I see the worry in her eyes</span>
+              <span data-time="91">But when I make it to the highest height</span>
+              <span data-time="93">I hope the moment will be frozen in time</span>
+              <span data-time="96">So they can all see your boy done did it</span>
+              <span data-time="99">And there can never be another like he</span>
+              <span data-time="102">Been manifesting what she praying for me</span>
+              <span data-time="105">Enemies all try fashion different weapons</span>
+              <span data-time="108">Dem no fi ever prosper</span>
+              <span data-time="109">Nuffa dem a know say Timmy Turnup</span>
+              <span data-time="111">Afi mashup d place in seconds</span>
+              <span data-time="113">Dem no fit ever stop am</span>
+              <span data-time="114">This a healing music</span>
+              <span data-time="116">I'm a musical doctor medicate your soul</span>
+              <span data-time="119">While the riddim is proper</span>
+              <span data-time="120">Highly recommended fi your sons and daughters</span>
+              <span data-time="123">Ain't nobody make 'em feel this way since Chaka</span>
+              <span data-time="125">Deep inna the chakra yuh</span>
+              <span data-time="127">Many things wey man dey see, we no fit talk am finish</span>
+              <span data-time="130">But we still gonna keep it movin with enough confidence</span>
+              <span data-time="132">Did it the most</span>
+              <span data-time="133">Did it the best</span>
+              <span data-time="134">Did it with too much finesse</span>
+              <span data-time="135">So you can see I'm not the type that you could try to finesse</span>
+              <span data-time="138">Oh no</span>
+              <span data-time="139">And if you got a problem</span>
+              <span data-time="140">I'll be with my dargs dem</span>
+              <span data-time="141">You might not last a day inna the place we come from</span>
+              <span data-time="144">You better keep running and maybe</span>
+              <span data-time="145">You'll get to where you wanna go too</span>
+              <span data-time="148">It's what they told you</span>
+              <span data-time="150">And after all you did</span>
+              <span data-time="152">It feels like chasing wind</span>
+              <span data-time="155">You still don't have the bills</span>
+              <span data-time="158">To pay for your sins</span>
+              <span data-time="160">And back when it started</span>
+              <span data-time="163">You thought that it would be</span>
+              <span data-time="166">A dream reality</span>
+              <span data-time="168">But nothing's ever what it seems</span>
+            </div>
+          </div>
+        </div>
+        <div class="custom-audio">
+          <button id="playBtn" class="play-btn"></button>
+          <input type="range" id="progress" min="0" max="100" value="0">
+          <audio id="audio1" src="chasingwind.mp3"></audio>
+        </div>
+        <div id="three-vis" style="width:420px;height:220px;margin:2em auto 0 auto;"></div>
+      </div>
+    </div>
+    <div class="subpage" id="page2"><button class="back-btn">返回主页</button><div class="subpage-content">Doing Time——Bazzi 2003-09-13</div></div>
+    <div class="subpage" id="page3"><button class="back-btn">返回主页</button><div class="subpage-content">The Boy and The Swan——Jean Dawson 2024-10-18</div></div>
+    <div class="subpage" id="page4"><button class="back-btn">返回主页</button><div class="subpage-content">Ghostbuster——Elijah Blake 2024-03-15</div></div>
+    <div class="subpage" id="page5"><button class="back-btn">返回主页</button><div class="subpage-content">DESPERATION——Cero Ismael 2022-03-25</div></div>
+    <div class="subpage" id="page6"><button class="back-btn">返回主页</button><div class="subpage-content">first order of business——Baby Keem 2021-09-10</div></div>
+    <div class="subpage" id="page7"><button class="back-btn">返回主页</button><div class="subpage-content">Fall In Line——K Camp 2020-04-24</div></div>
+    <div class="subpage" id="page8"><button class="back-btn">返回主页</button><div class="subpage-content">HOP OUT CHO FEELINS——Kal Banx / Smino/ Buddy</div></div>
+    <div class="subpage" id="page9"><button class="back-btn">返回主页</button><div class="subpage-content">WAY TOO FAST——Cero Iamael 2025-03-27</div></div>
+    <div class="subpage" id="page10"><button class="back-btn">返回主页</button><div class="subpage-content">Rearrange My World——Daneil Caesar/Rex Orange County 2025-02-14</div></div>
+    <div class="subpage" id="page11"><button class="back-btn">返回主页</button><div class="subpage-content">There's a Field (That's Only Yours)——Daneil Caesar/Rex Orange County 2025-02-14</div></div>
+  </div>
+  <canvas id="halftone"></canvas>
+  <!-- Three.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
+  <script>
+    const canvas = document.getElementById('halftone');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // 重置变换
+    ctx.scale(dpr, dpr);
+
+    let points = [];
+    const spacing = 4;
+    const baseHue = 130;
+    const baseSaturation = 28;
+    const baseLightness = 50;
+
+    function generatePoints() {
+      points = [];
+      for (let y = 0; y < height; y += spacing) {
+        for (let x = 0; x < width; x += spacing) {
+          // 多频率正弦波叠加，模拟片状不规则分布
+          const base = 0.5
+            + 0.18 * Math.sin(x * 0.004 + y * 0.006)
+            + 0.13 * Math.sin(x * 0.012 - y * 0.008)
+            + 0.09 * Math.sin((x + y) * 0.008)
+            + 0.07 * Math.cos(x * 0.02 + y * 0.01)
+            + 0.06 * Math.sin(x * 0.02 - y * 0.018)
+            + 0.05 * Math.cos((x - y) * 0.014)
+            + 0.04 * Math.sin(x * 0.03 + y * 0.025)
+            // 中下部整体偏亮
+            + (y > height * 0.5 ? (y - height * 0.5) / height * 0.5 : 0);
+          const noise = (Math.random() - 0.5) * 0.3;
+          const gradient = Math.max(0, Math.min(1, base + noise - y / height));
+          const adjustedGradient = gradient * 0.7;
+          const radius = 0.5 + 1.5 * gradient;
+          const hue = baseHue + (Math.random() - 0.5) * 2;
+          const saturation = baseSaturation + (Math.random() - 0.5) * 10;
+          const lightness = baseLightness + (Math.random() - 0.5) * 4;
+          points.push({
+            ox: x, oy: y,
+            x, y,
+            vz: 0,
+            z: 0,
+            radius, gradient: adjustedGradient, hue, saturation, lightness
+          });
+        }
+      }
+    }
+
+    generatePoints();
+
+    window.addEventListener('resize', () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      generatePoints();
+    });
+
+    let mouse = { x: -1000, y: -1000, lastX: -1000, lastY: -1000, vx: 0, vy: 0, moving: false };
+
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (width / rect.width);
+      const my = (e.clientY - rect.top) * (height / rect.height);
+      mouse.vx = mx - mouse.x;
+      mouse.vy = my - mouse.y;
+      mouse.x = mx;
+      mouse.y = my;
+      mouse.moving = true;
+    });
+    canvas.addEventListener('mouseleave', () => {
+      mouse.x = -1000;
+      mouse.y = -1000;
+      mouse.vx = 0;
+      mouse.vy = 0;
+      mouse.moving = false;
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+
+      for (const p of points) {
+        // 计算点到鼠标的距离
+        let dx = p.ox - mouse.x;
+        let dy = p.oy - mouse.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+
+        // 鼠标附近的点"立即凸起"，离开立即回原位
+        let targetZ = 0;
+        if (dist < 320) {
+          // 保持范围，增大凸起幅度
+          targetZ = 64 * Math.exp(-dist * dist / (2 * 120 * 120));
+        }
+        // 优化：用线性插值让点阵对鼠标更灵敏
+        p.z += (targetZ - p.z) * 1;
+
+        // 绘制时y轴抬高
+        ctx.beginPath();
+        ctx.arc(p.ox, p.oy - p.z, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${p.hue}, ${p.saturation}%, ${p.lightness}%)`;
+        ctx.globalAlpha = 0.6 * p.gradient + 0.4;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(draw);
+    }
+    draw();
+
+    // 字母凸起交互
+    const needleTitle = document.getElementById('needleTitle');
+    const spans = needleTitle.querySelectorAll('span');
+    needleTitle.addEventListener('mousemove', e => {
+      const rect = needleTitle.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      spans.forEach(span => {
+        const srect = span.getBoundingClientRect();
+        const sx = (srect.left + srect.right) / 2 - rect.left;
+        if (Math.abs(mx - sx) < srect.width * 0.7) {
+          span.classList.add('active');
+        } else {
+          span.classList.remove('active');
+        }
+      });
+    });
+    needleTitle.addEventListener('mouseleave', () => {
+      spans.forEach(span => span.classList.remove('active'));
+    });
+
+    // 左侧列表交互
+    document.querySelectorAll('.list-block a span').forEach(span => {
+      span.addEventListener('mouseenter', () => {
+        span.classList.add('hovered');
+      });
+      span.addEventListener('mouseleave', () => {
+        span.classList.remove('hovered');
+      });
+    });
+
+    // 页面切换逻辑
+    const listBlock = document.getElementById('listBlock');
+    const subpages = document.getElementById('subpages');
+    const mainContent = [document.querySelector('.needle-title'), listBlock, document.getElementById('halftone')];
+    document.querySelectorAll('.list-block a').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        // 隐藏主内容
+        mainContent.forEach(el => el.style.display = 'none');
+        // 显示对应子页面
+        const pid = a.getAttribute('data-page');
+        document.getElementById(pid).style.display = 'flex';
+      });
+    });
+    // 返回主页
+    document.querySelectorAll('.back-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // 隐藏所有子页面
+        document.querySelectorAll('.subpage').forEach(p => p.style.display = 'none');
+        // 显示主内容
+        mainContent.forEach(el => el.style.display = '');
+      });
+    });
+
+    // ===== three.js 音乐粒子可视化 =====
+    function initThreeMusicVis() {
+      const container = document.getElementById('three-vis');
+      if (!container) return;
+      // 清空容器
+      container.innerHTML = '';
+      // three.js 场景
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, 420/220, 1, 1000);
+      camera.position.z = 220;
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setClearColor(0x000000, 0); // 透明
+      renderer.setSize(420, 220);
+      container.appendChild(renderer.domElement);
+      // 粒子参数
+      const PARTICLE_COUNT = 128;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(PARTICLE_COUNT * 3);
+      const scales = new Float32Array(PARTICLE_COUNT);
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2;
+        positions[i*3] = Math.cos(angle) * 80;
+        positions[i*3+1] = Math.sin(angle) * 40;
+        positions[i*3+2] = 0;
+        scales[i] = 1;
+      }
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('scale', new THREE.BufferAttribute(scales, 1));
+      // 绿色透明粒子材质
+      const material = new THREE.PointsMaterial({
+        color: 0x1ecb6b,
+        size: 10,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false
+      });
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+      // 动画（与音频无关，纯动态）
+      function animate() {
+        requestAnimationFrame(animate);
+        // 粒子呼吸动效和随机波动
+        const t = performance.now() * 0.001;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const baseY = Math.sin((i/PARTICLE_COUNT)*Math.PI*2) * 40;
+          const wave = Math.sin(t*2 + i*0.2) * 18 + Math.cos(t*1.3 + i*0.5) * 8;
+          positions[i*3+1] = baseY + wave;
+          scales[i] = 0.7 + 0.5 * Math.abs(Math.sin(t*2 + i));
+        }
+        geometry.attributes.position.needsUpdate = true;
+        geometry.attributes.scale.needsUpdate = true;
+        material.size = 10 + Math.sin(t*2) * 2;
+        renderer.render(scene, camera);
+      }
+      animate();
+    }
+    // 只在page1子页面显示时初始化
+    function observePage1Vis() {
+      const page1 = document.getElementById('page1');
+      const visInited = { value: false };
+      const showHandler = () => {
+        if (page1.style.display === 'flex' && !visInited.value) {
+          visInited.value = true;
+          setTimeout(initThreeMusicVis, 200); // 延迟，确保audio已渲染
+        }
+        if (page1.style.display !== 'flex') {
+          visInited.value = false;
+        }
+      };
+      // 监听页面切换
+      setInterval(showHandler, 300);
+    }
+    observePage1Vis();
+
+    // ===== 橙色流动渐变背景，仅在page1显示 =====
+    // 每片渐变独立参数
+    const flowBgParams = [
+      { phase: Math.random() * 10, speed: 0.00032 + Math.random() * 0.00018, ampX: 0.18 + Math.random() * 0.06, ampY: 0.13 + Math.random() * 0.06, freqX: 1.2 + Math.random() * 0.5, freqY: 1.2 + Math.random() * 0.5, rBase: 320 + Math.random() * 30, rAmp: 60 + Math.random() * 30 },
+      { phase: Math.random() * 10, speed: 0.00032 + Math.random() * 0.00018, ampX: 0.18 + Math.random() * 0.06, ampY: 0.13 + Math.random() * 0.06, freqX: 1.2 + Math.random() * 0.5, freqY: 1.2 + Math.random() * 0.5, rBase: 320 + Math.random() * 30, rAmp: 60 + Math.random() * 30 },
+      { phase: Math.random() * 10, speed: 0.00032 + Math.random() * 0.00018, ampX: 0.18 + Math.random() * 0.06, ampY: 0.13 + Math.random() * 0.06, freqX: 1.2 + Math.random() * 0.5, freqY: 1.2 + Math.random() * 0.5, rBase: 320 + Math.random() * 30, rAmp: 60 + Math.random() * 30 }
+    ];
+    function drawFlowBg() {
+      const page1 = document.getElementById('page1');
+      const canvas = document.getElementById('bg-flow');
+      if (!canvas) return;
+      if (page1 && page1.style.display === 'flex') {
+        canvas.style.display = 'block';
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        const now = performance.now();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < flowBgParams.length; i++) {
+          const p = flowBgParams[i];
+          const t = now * p.speed + p.phase;
+          const cx = window.innerWidth * (0.3 + p.ampX * Math.sin(t * p.freqX + i));
+          const cy = window.innerHeight * (0.4 + p.ampY * Math.cos(t * p.freqY + i * 2));
+          const r = p.rBase + p.rAmp * Math.sin(t * 0.7 + i);
+          const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+          g.addColorStop(0, 'rgba(255,140,0,0.32)');
+          g.addColorStop(1, 'rgba(255,140,0,0)');
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.fillStyle = g;
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        canvas.style.display = 'none';
+      }
+      requestAnimationFrame(drawFlowBg);
+    }
+    drawFlowBg();
+
+    // 专辑封面翻转交互
+    function setupAlbumFlip() {
+      const flip = document.querySelector('#page1 .album-flip');
+      if (!flip) return;
+      flip.addEventListener('click', function(e) {
+        this.classList.toggle('flipped');
+      });
+      // 防止点击背面内容时事件冒泡导致无法翻回
+      const back = flip.querySelector('.album-flip-back');
+      back.addEventListener('click', function(e) {
+        e.stopPropagation();
+        flip.classList.remove('flipped');
+      });
+    }
+    // 监听页面切换，进入page1时初始化
+    function observeAlbumFlip() {
+      const page1 = document.getElementById('page1');
+      let inited = false;
+      setInterval(() => {
+        if (page1.style.display === 'flex' && !inited) {
+          inited = true;
+          setTimeout(setupAlbumFlip, 200);
+        }
+        if (page1.style.display !== 'flex') {
+          inited = false;
+        }
+      }, 300);
+    }
+    observeAlbumFlip();
+
+    // 自定义极简播放器交互
+    function setupCustomAudio() {
+      const audio = document.getElementById('audio1');
+      const playBtn = document.getElementById('playBtn');
+      const progress = document.getElementById('progress');
+      if (!audio || !playBtn || !progress) return;
+      // 播放/暂停切换
+      function updateBtn() {
+        if (audio.paused) {
+          playBtn.classList.remove('paused');
+        } else {
+          playBtn.classList.add('paused');
+        }
+      }
+      playBtn.onclick = function() {
+        if (audio.paused) {
+          audio.play();
+        } else {
+          audio.pause();
+        }
+      };
+      audio.addEventListener('play', updateBtn);
+      audio.addEventListener('pause', updateBtn);
+      // 进度条联动
+      audio.addEventListener('timeupdate', function() {
+        progress.value = audio.duration ? (audio.currentTime / audio.duration * 100) : 0;
+      });
+      progress.addEventListener('input', function() {
+        if (audio.duration) {
+          audio.currentTime = progress.value / 100 * audio.duration;
+        }
+      });
+      // 初始化
+      updateBtn();
+    }
+    // 监听页面切换，进入page1时初始化
+    function observeCustomAudio() {
+      const page1 = document.getElementById('page1');
+      let inited = false;
+      setInterval(() => {
+        if (page1.style.display === 'flex' && !inited) {
+          inited = true;
+          setTimeout(setupCustomAudio, 200);
+        }
+        if (page1.style.display !== 'flex') {
+          inited = false;
+        }
+      }, 300);
+    }
+    observeCustomAudio();
+
+    // 歌词同步高亮
+    const audio = document.getElementById('audio1');
+    const lyricContent = document.getElementById('lyricContent');
+    const lines = Array.from(lyricContent.querySelectorAll('span'));
+    function syncLyric() {
+      const current = audio.currentTime + 1; // 提前1秒高亮
+      let curIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const t = parseFloat(lines[i].getAttribute('data-time'));
+        if (current >= t) curIdx = i;
+      }
+      lines.forEach((span, idx) => {
+        if (idx === curIdx) {
+          span.classList.add('active');
+        } else {
+          span.classList.remove('active');
+        }
+      });
+      // 自动滚动到当前行
+      const activeSpan = lines[curIdx];
+      const lyricBlock = lyricContent.parentElement;
+      const targetY = activeSpan.offsetTop + activeSpan.offsetHeight / 2 - lyricBlock.clientHeight * 0.7;
+      const totalHeight = lyricContent.scrollHeight - lyricBlock.clientHeight;
+      const scrollY = Math.max(0, Math.min(targetY, totalHeight));
+      lyricContent.style.transform = `translateY(-${scrollY}px)`;
+    }
+    audio.addEventListener('timeupdate', syncLyric);
+    audio.addEventListener('seeked', syncLyric);
+    audio.addEventListener('play', syncLyric);
+    audio.addEventListener('pause', syncLyric);
+    // 初始化
+    syncLyric();
+  </script>
+  <script src="main.js"></script>
+</body>
+</html> 
